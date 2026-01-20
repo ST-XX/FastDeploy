@@ -1286,15 +1286,21 @@ else:
 
 register_custom_python_op = register_op
 
-
 from functools import wraps
+
+try:
+    import nvtx
+except ImportError:
+    nvtx = None
 
 
 def nvtx_annotate(message, color="blue"):
-    """NVTX"""
-    import nvtx
+    """A decorator to add NVTX annotations for profiling."""
 
     def decorator(func):
+        if nvtx is None:
+            return func
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             with nvtx.annotate(message, color=color):
@@ -1307,27 +1313,31 @@ def nvtx_annotate(message, color="blue"):
 
 def nvtx_class_annotate(color="blue"):
     """
-    类装饰器：为类的所有公有方法自动添加 NVTX 注解
-    message 格式：ClassName.method_name
+    A class decorator that automatically adds NVTX annotations to all public
+    methods of a class. The annotation message will be in the format
+    'ClassName.method_name'.
     """
 
     def class_decorator(cls):
+        if nvtx is None:
+            return cls
+
         class_name = cls.__name__
-        # 遍历类的所有属性
+        # Iterate over all attributes of the class
         for attr_name in dir(cls):
-            # 过滤掉私有方法（以 _ 开头）和特殊方法
+            # Filter out private (starting with '_') and special methods
             if attr_name.startswith("_"):
                 continue
             attr = getattr(cls, attr_name)
-            # 检查是否为可调用的方法
+            # Check if it is a callable method
             if callable(attr):
-                # 生成注解消息
+                # Generate annotation message
                 message = f"{class_name}.{attr_name}"
 
-                # 应用 NVTX 装饰器
+                # Apply NVTX decorator
                 decorated_method = nvtx_annotate(message, color=color)(attr)
 
-                # 将装饰后的方法设置回类
+                # Set the decorated method back to the class
                 setattr(cls, attr_name, decorated_method)
 
         return cls
